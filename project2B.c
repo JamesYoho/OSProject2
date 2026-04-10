@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "dp.h"
+#include <sys/time.h>
 
 int main(int argc, char *argv[]) {
     // argc should be 2: the program name and the filename
@@ -64,11 +65,15 @@ int main(int argc, char *argv[]) {
         sem_destroy(&sem_vars[i]);
     }
 
+     
     return 0;
 }
 
 int center_chopstick_available = 1;
-int using_center_chopstick[NUMBER] = {0}
+int using_center_chopstick[NUMBER] = {0};
+struct timeval philosopher_before[NUMBER];
+struct timeval philosopher_after[NUMBER];
+double philosopher_wait_times[NUMBER] = {0};
 
 void *philosopher(void *param) {
     int id = *(int*) param; // Cast the void pointer back to an integer ID
@@ -93,25 +98,40 @@ void *philosopher(void *param) {
     }
 }
 
+void calculate_time(int number){
+    struct timeval before = philosopher_before[number];
+    struct timeval after = philosopher_after[number];
+    double waittime = (double)(after.tv_usec-before.tv_usec)/1000 + (double)(after.tv_sec-before.tv_sec)*1000;
+    philosopher_wait_times[number] += waittime;
+}
+
 void pickup_chopsticks(int number){
     pthread_mutex_lock(&mutex_lock);
     state[number] = HUNGRY;
+    gettimeofday(&philosopher_before[number], NULL);
+
     int left_number = get_left(number);
     int right_number = get_right(number);
 
     if(state[number] == HUNGRY && state[left_number] != EATING && state[right_number] != EATING){
         state[number] = EATING;
-        holding_center[number] = 0;
+        gettimeofday(&philosopher_after[number], NULL);
+        calculate_time(number);
+        using_center_chopstick[number] = 0;
         sem_post(&sem_vars[number]);
     } else if (state[number] == HUNGRY && state[left_number] != EATING && center_chopstick_available){
         state[number] = EATING;
+        gettimeofday(&philosopher_after[number], NULL);
+        calculate_time(number);
         center_chopstick_available = 0;
-        holding_center[number] = 1;
+        using_center_chopstick[number] = 1;
         sem_post(&sem_vars[number]);
     } else if (state[number] == HUNGRY && state[right_number] != EATING && center_chopstick_available){
         state[number] = EATING;
+        gettimeofday(&philosopher_after[number], NULL);
+        calculate_time(number);
         center_chopstick_available = 0;
-        holding_center[number] = 1;
+        using_center_chopstick[number] = 1;
         sem_post(&sem_vars[number]);  
     }
 
@@ -124,9 +144,9 @@ void return_chopsticks(int number){
     pthread_mutex_lock(&mutex_lock);
     state[number] = THINKING;
 
-    if (holding_center[number] == 1) {
+    if (using_center_chopstick[number] == 1) {
         center_chopstick_available = 1;
-        holding_center[number] = 0;
+        using_center_chopstick[number] = 0;
     }
 
     for(int i = 0; i < NUMBER; i++){
@@ -136,17 +156,23 @@ void return_chopsticks(int number){
 
             if(state[i] == HUNGRY && state[left_number] != EATING && state[right_number] != EATING){
                 state[i] = EATING;
-                holding_center[i] = 0;
+                gettimeofday(&philosopher_after[number], NULL);
+                calculate_time(i);
+                using_center_chopstick[i] = 0;
                 sem_post(&sem_vars[i]);
             } else if (state[i] == HUNGRY && state[left_number] != EATING && center_chopstick_available){
                 state[i] = EATING;
+                gettimeofday(&philosopher_after[number], NULL);
+                calculate_time(i);
                 center_chopstick_available = 0;
-                holding_center[i] = 1;
+                using_center_chopstick[i] = 1;
                 sem_post(&sem_vars[i]);
             } else if (state[i] == HUNGRY && state[right_number] != EATING && center_chopstick_available){
                 state[i] = EATING;
+                gettimeofday(&philosopher_after[number], NULL);
+                calculate_time(i);
                 center_chopstick_available = 0;
-                holding_center[i] = 1;
+                using_center_chopstick[i] = 1;
                 sem_post(&sem_vars[i]);  
             }
         }
