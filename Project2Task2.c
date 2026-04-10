@@ -14,6 +14,7 @@ struct timeval philosopher_before[NUMBER];
 struct timeval philosopher_after[NUMBER];
 double philosopher_wait_times[NUMBER] = {0};
 
+// Helper function to update the toal wait time for a given philosopher
 void calculate_time(int number){
     struct timeval before = philosopher_before[number];
     struct timeval after = philosopher_after[number];
@@ -21,18 +22,37 @@ void calculate_time(int number){
     philosopher_wait_times[number] += waittime;
 }
 
+// Helper function to print out the average and max waiting times
+void get_results(){
+    double max = 0;
+
+    double totalWaitingTime = 0;
+    for(int i = 0; i < NUMBER; i++){
+        double time = philosopher_wait_times[i];
+        if (time > max){
+            max = time;
+        }
+        totalWaitingTime += time;
+    }
+    double average = totalWaitingTime / NUMBER;
+    printf("\n\nThe average waiting time amongst the philosophers was %f seconds\nThe Max waiting time amongst the philosphers was %f seconds\n", (average / 1000), (max / 1000));
+}
+
+
 int main(int argc, char *argv[]) {
-    // argc should be 2: the program name and the filename
+    // There should be 2 arguments: the program name and the filename where the random numbers are stored.
     if (argc != 2) {
         return 1;
     }
 
+    // Open random numbers file
     FILE *file = fopen(argv[1], "r");
     if (file == NULL) {
         perror("Error opening file");
         return 1;
     }
 
+    // Read in the random numbers to an array
     int count = 0;
     while (count < MAX_LENGTH && fscanf(file, "%d", &rand_numbers[count]) == 1) {
         count++;
@@ -49,8 +69,10 @@ int main(int argc, char *argv[]) {
     rand_position = 0;
     total_numbers = count;
 
+    // Create 1 thread for each philosopher
     pthread_t philosopher_threads[NUMBER]; 
 
+    // Create locks
     pthread_mutex_init(&mutex_lock, NULL);
     pthread_mutex_init(&mutex_rand, NULL);
 
@@ -62,7 +84,6 @@ int main(int argc, char *argv[]) {
         sem_init(&sem_vars[i], 0, 0); 
     }
 
-
     printf("Starting the Dining Philosophers simulation...\n");
 
     for (int i = 0; i < NUMBER; i++) {
@@ -73,16 +94,13 @@ int main(int argc, char *argv[]) {
         printf("Philosopher %d has sat at the table.\n", i);
     }
 
+    // Join all the threads back in when they are done
     for (int i = 0; i < NUMBER; i++) {
         pthread_join(philosopher_threads[i], NULL);
     }
-
-    double waitingTime = 0;
-    for(int i = 0; i < NUMBER; i++){
-        waitingTime += philosopher_wait_times[i];
-    }
+    get_results();
     
-    printf("Total time waiting is %f seconds\n", (waitingTime/1000));
+    // Delete the locks and sempahore once we are done with them
     pthread_mutex_destroy(&mutex_lock);
     pthread_mutex_destroy(&mutex_rand);
     for (int i = 0; i < NUMBER; i++) {
@@ -122,35 +140,44 @@ void try_eat(int number) {
         int left_c = number; 
         int right_c = get_right(number);
 
-        // Try standard configuration first (saves the middle one for others)
+        // Try using left and right chopsticks
         if (chopstick[left_c] && chopstick[right_c]) {
+            // Update variables to show chopstick usage
             chopstick[left_c] = 0;
             chopstick[right_c] = 0;
             using_left[number] = 1;
             using_right[number] = 1;
             state[number] = EATING;
+
+            // Do wait time calculations
             gettimeofday(&philosopher_after[number], NULL);
             calculate_time(number);
             sem_post(&sem_vars[number]);
         } 
-        // Otherwise try left + middle
+        // Otherwise try left and middle chopsticks
         else if (chopstick[left_c] && middle_chopstick) {
+            // Update variables to show chopstick usage
             chopstick[left_c] = 0;
             middle_chopstick = 0;
             using_left[number] = 1;
             using_middle[number] = 1;
             state[number] = EATING;
+
+            // Do wait time calculations
             gettimeofday(&philosopher_after[number], NULL);
             calculate_time(number);
             sem_post(&sem_vars[number]);
         } 
-        // Otherwise try right + middle
+        // Otherwise try right and middle chopsticks
         else if (chopstick[right_c] && middle_chopstick) {
+            // Update variables to show chopstick usage
             chopstick[right_c] = 0;
             middle_chopstick = 0;
             using_right[number] = 1;
             using_middle[number] = 1;
             state[number] = EATING;
+
+            // Do wait time calculations
             gettimeofday(&philosopher_after[number], NULL);
             calculate_time(number);
             sem_post(&sem_vars[number]);
@@ -159,8 +186,11 @@ void try_eat(int number) {
 }
 
 void pickup_chopsticks(int number){
+    // Get the lock and change state to hungry
     pthread_mutex_lock(&mutex_lock);
     state[number] = HUNGRY;
+
+    // Get the time as soon as the philosopher is hungry
     gettimeofday(&philosopher_before[number], NULL);
 
     try_eat(number);
@@ -174,6 +204,7 @@ void return_chopsticks(int number){
     pthread_mutex_lock(&mutex_lock);
     state[number] = THINKING;
 
+    // Update the chopstick usage 
     if (using_left[number]) {
         chopstick[number] = 1;
         using_left[number] = 0;
@@ -187,7 +218,7 @@ void return_chopsticks(int number){
         using_middle[number] = 0;
     }
 
-    // Since the middle chopstick can free up *anyone* who is hungry (not just immediate neighbors),
+    // Since the middle chopstick can free up anyone who is hungry,
     // it's safest to let everyone who is currently HUNGRY try to eat.
     for (int i = 0; i < NUMBER; i++) {
         if (state[i] == HUNGRY) {
@@ -199,6 +230,7 @@ void return_chopsticks(int number){
 
 }
 
+// Locked function to get the next random number for sleep duration
 int get_next_number() {
     pthread_mutex_lock(&mutex_rand);
     
@@ -210,6 +242,7 @@ int get_next_number() {
     return num;
 }
 
+// Helper function to get the number for the philosopher on your right
 int get_left(int number){
     if(number == 0){
         return NUMBER - 1;
@@ -219,6 +252,7 @@ int get_left(int number){
     }
 }
 
+// Helper function to get the number for the philosopher on your left
 int get_right(int number){
     return (number + 1)%NUMBER;
 }
