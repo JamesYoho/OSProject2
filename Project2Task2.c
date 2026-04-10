@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "dp.h"
+#include <sys/time.h>
 
 int chopstick[NUMBER];
 int middle_chopstick = 1;
@@ -9,6 +10,16 @@ int middle_chopstick = 1;
 int using_left[NUMBER] = {0};
 int using_right[NUMBER] = {0};
 int using_middle[NUMBER] = {0};
+struct timeval philosopher_before[NUMBER];
+struct timeval philosopher_after[NUMBER];
+double philosopher_wait_times[NUMBER] = {0};
+
+void calculate_time(int number){
+    struct timeval before = philosopher_before[number];
+    struct timeval after = philosopher_after[number];
+    double waittime = (double)(after.tv_usec-before.tv_usec)/1000 + (double)(after.tv_sec-before.tv_sec)*1000;
+    philosopher_wait_times[number] += waittime;
+}
 
 int main(int argc, char *argv[]) {
     // argc should be 2: the program name and the filename
@@ -66,6 +77,12 @@ int main(int argc, char *argv[]) {
         pthread_join(philosopher_threads[i], NULL);
     }
 
+    double waitingTime = 0;
+    for(int i = 0; i < NUMBER; i++){
+        waitingTime += philosopher_wait_times[i];
+    }
+    
+    printf("Total time waiting is %f seconds\n", (waitingTime/1000));
     pthread_mutex_destroy(&mutex_lock);
     pthread_mutex_destroy(&mutex_rand);
     for (int i = 0; i < NUMBER; i++) {
@@ -112,6 +129,8 @@ void try_eat(int number) {
             using_left[number] = 1;
             using_right[number] = 1;
             state[number] = EATING;
+            gettimeofday(&philosopher_after[number], NULL);
+            calculate_time(number);
             sem_post(&sem_vars[number]);
         } 
         // Otherwise try left + middle
@@ -121,6 +140,8 @@ void try_eat(int number) {
             using_left[number] = 1;
             using_middle[number] = 1;
             state[number] = EATING;
+            gettimeofday(&philosopher_after[number], NULL);
+            calculate_time(number);
             sem_post(&sem_vars[number]);
         } 
         // Otherwise try right + middle
@@ -130,6 +151,8 @@ void try_eat(int number) {
             using_right[number] = 1;
             using_middle[number] = 1;
             state[number] = EATING;
+            gettimeofday(&philosopher_after[number], NULL);
+            calculate_time(number);
             sem_post(&sem_vars[number]);
         }
     }
@@ -138,6 +161,8 @@ void try_eat(int number) {
 void pickup_chopsticks(int number){
     pthread_mutex_lock(&mutex_lock);
     state[number] = HUNGRY;
+    gettimeofday(&philosopher_before[number], NULL);
+
     try_eat(number);
 
     pthread_mutex_unlock(&mutex_lock);
