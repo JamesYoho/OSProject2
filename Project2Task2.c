@@ -1,20 +1,35 @@
+/*
+  Author:  James Yoho and Daniel Whaley
+  Course:  COMP 340, Operating Systems
+  Date:    10 April 2026
+  Description:   This file implements the
+                 functionality required for
+                 Project 2, Task 2.
+  Compile with:  gcc -o task2 task2.c -pthread
+  Run with:      ./task2
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "dp.h"
 #include <sys/time.h>
 
+// Variables to track if each chopstick is being used
 int chopstick[NUMBER];
 int middle_chopstick = 1;
 
+// Arrays to track which chopsticks each philosopher is actively using
 int using_left[NUMBER] = {0};
 int using_right[NUMBER] = {0};
 int using_middle[NUMBER] = {0};
+
+/// Arrays used to calculate waiting time
 struct timeval philosopher_before[NUMBER];
 struct timeval philosopher_after[NUMBER];
 double philosopher_wait_times[NUMBER] = {0};
 
-// Helper function to update the toal wait time for a given philosopher
 void calculate_time(int number){
     struct timeval before = philosopher_before[number];
     struct timeval after = philosopher_after[number];
@@ -22,7 +37,6 @@ void calculate_time(int number){
     philosopher_wait_times[number] += waittime;
 }
 
-// Helper function to print out the average and max waiting times
 void get_results(){
     double max = 0;
 
@@ -42,6 +56,7 @@ void get_results(){
 int main(int argc, char *argv[]) {
     // There should be 2 arguments: the program name and the filename where the random numbers are stored.
     if (argc != 2) {
+        printf("There should be exactly 2 arguments in the command line.\n");
         return 1;
     }
 
@@ -64,7 +79,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Successfully loaded %d random numbers from %s.\n", count, argv[1]);
+    printf("Successfully loaded random numbers from %s.\n", argv[1]);
 
     rand_position = 0;
     total_numbers = count;
@@ -84,7 +99,7 @@ int main(int argc, char *argv[]) {
         sem_init(&sem_vars[i], 0, 0); 
     }
 
-    printf("Starting the Dining Philosophers simulation...\n");
+    printf("Starting the Dining Philosophers simulation:\n");
 
     for (int i = 0; i < NUMBER; i++) {
                 if (pthread_create(&philosopher_threads[i], NULL, philosopher, &thread_id[i]) != 0) {
@@ -134,7 +149,6 @@ void *philosopher(void *param) {
     return NULL;
 }
 
-// Helper function to check availability and assign chopsticks
 void try_eat(int number) {
     if (state[number] == HUNGRY) {
         int left_c = number; 
@@ -230,7 +244,6 @@ void return_chopsticks(int number){
 
 }
 
-// Locked function to get the next random number for sleep duration
 int get_next_number() {
     pthread_mutex_lock(&mutex_rand);
     
@@ -242,7 +255,6 @@ int get_next_number() {
     return num;
 }
 
-// Helper function to get the number for the philosopher on your right
 int get_left(int number){
     if(number == 0){
         return NUMBER - 1;
@@ -252,7 +264,6 @@ int get_left(int number){
     }
 }
 
-// Helper function to get the number for the philosopher on your left
 int get_right(int number){
     return (number + 1)%NUMBER;
 }

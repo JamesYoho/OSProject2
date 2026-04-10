@@ -15,9 +15,11 @@
 #include "dp.h"
 #include <sys/time.h>
 
+/// Arrays used to calculate waiting time
 struct timeval philosopher_before[NUMBER];
 struct timeval philosopher_after[NUMBER];
 double philosopher_wait_times[NUMBER] = {0};
+
 
 void calculate_time(int number){
     struct timeval before = philosopher_before[number];
@@ -44,6 +46,7 @@ void get_results(){
 int main(int argc, char *argv[]) {
     // There should be 2 arguments: the program name and the filename where the random numbers are stored.
     if (argc != 2) {
+        printf("There should be exactly 2 arguments in the command line.\n");
         return 1;
     }
 
@@ -66,7 +69,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Successfully loaded %d random numbers from %s.\n", count, argv[1]);
+    printf("Successfully loaded the random numbers from %s.\n", argv[1]);
 
     rand_position = 0;
     total_numbers = count;
@@ -85,7 +88,7 @@ int main(int argc, char *argv[]) {
         sem_init(&sem_vars[i], 0, 0); 
     }
 
-    printf("Starting the Dining Philosophers simulation...\n");
+    printf("Starting the Dining Philosophers simulation:\n");
 
     for (int i = 0; i < NUMBER; i++) {
         if (pthread_create(&philosopher_threads[i], NULL, philosopher, &thread_id[i]) != 0) {
@@ -181,7 +184,6 @@ void return_chopsticks(int number){
 
 }
 
-// Locked function to get the next random number for sleep duration
 int get_next_number() {
     pthread_mutex_lock(&mutex_rand);
     
@@ -193,7 +195,6 @@ int get_next_number() {
     return num;
 }
 
-// Helper function to get the number for the philosopher on your right
 int get_left(int number){
     if(number == 0){
         return NUMBER-1;
@@ -203,7 +204,6 @@ int get_left(int number){
     }
 }
 
-// Helper function to get the number for the philosopher on your left
 int get_right(int number){
     return (number + 1)%NUMBER;
 }
